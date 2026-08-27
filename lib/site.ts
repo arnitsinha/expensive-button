@@ -83,7 +83,7 @@ async function readCapped(
 }
 
 /** Parse <link rel="icon"...> candidates out of an HTML document. */
-export function extractIconHrefs(html: string, base: string): string[] {
+function extractIconHrefs(html: string, base: string): string[] {
   const out: { href: string; score: number }[] = [];
   const linkRe = /<link\b[^>]*>/gi;
   for (const m of html.matchAll(linkRe)) {

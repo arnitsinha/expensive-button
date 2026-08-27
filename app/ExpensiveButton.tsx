@@ -66,6 +66,16 @@ function faviconSrc(site: string) {
   return `/api/favicon?site=${encodeURIComponent(site)}&v=${FAVICON_V}`;
 }
 
+/** Fetch the current button state, or null on any failure. */
+async function fetchState(): Promise<ButtonState | null> {
+  try {
+    const res = await fetch("/api/state", { cache: "no-store" });
+    return res.ok ? ((await res.json()) as ButtonState) : null;
+  } catch {
+    return null;
+  }
+}
+
 // Does the typed value look like a complete domain worth fetching? Mirrors the
 // server's isPublicHostname so we don't fire requests for half-typed hosts
 // like "github.co" while the user is still typing "github.com".
@@ -192,10 +202,11 @@ export default function ExpensiveButton({
   const myLastPress = useRef<number | null>(null);
   const payBtn = useRef<HTMLButtonElement>(null);
   const nameInput = useRef<HTMLInputElement>(null);
+  const nextToastId = useRef(0);
   const now = useNow();
 
   const toast = useCallback((text: string, kind: Toast["kind"] = "info") => {
-    const id = Math.random();
+    const id = (nextToastId.current += 1);
     setToasts((t) => [...t, { id, text, kind }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000);
   }, []);
@@ -226,10 +237,8 @@ export default function ExpensiveButton({
     let alive = true;
     const poll = async () => {
       if (document.hidden) return;
-      try {
-        const res = await fetch("/api/state", { cache: "no-store" });
-        if (res.ok && alive) apply((await res.json()) as ButtonState);
-      } catch {}
+      const s = await fetchState();
+      if (s && alive) apply(s);
     };
     const id = setInterval(poll, POLL_MS);
     return () => {
@@ -277,9 +286,8 @@ export default function ExpensiveButton({
         );
         const { status } = (await res.json()) as { status: string };
         if (status === "pressed") {
-          const fresh = await fetch("/api/state", { cache: "no-store" });
-          if (fresh.ok && alive)
-            apply((await fresh.json()) as ButtonState, true);
+          const s = await fetchState();
+          if (s && alive) apply(s, true);
           return;
         }
         if (status === "refunded") {
@@ -359,8 +367,8 @@ export default function ExpensiveButton({
       const data = await res.json();
       if (res.status === 409 && typeof data.minimum === "number") {
         // Outbid while deciding: adopt the new minimum, keep their extra.
-        const fresh = await fetch("/api/state", { cache: "no-store" });
-        if (fresh.ok) apply((await fresh.json()) as ButtonState);
+        const s = await fetchState();
+        if (s) apply(s);
         throw new Error(
           `Someone beat you to it - the minimum is now ${money(data.minimum)}. Pay that instead?`,
         );
