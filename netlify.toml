@@ -1,0 +1,10 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Set these in Netlify UI -> Site configuration -> Environment variables:
+#   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, ADMIN_TOKEN, NEXT_PUBLIC_SITE_URL
+# Netlify Blobs is used automatically for the ledger (NETLIFY=true).
