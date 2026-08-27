@@ -59,8 +59,9 @@ export async function createCheckout(
     },
     success_url: `${origin}/?paid=1&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/?canceled=1`,
-    // Sessions expire fast so a stale minimum doesn't linger in a tab.
-    expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
+    // Stripe requires expires_at to be at least 30 minutes out; use 60 so
+    // clock skew can't reject it. Stale minimums are handled by the webhook.
+    expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
   });
   if (!session.url) throw new Error("Stripe did not return a checkout URL");
   return session.url;
