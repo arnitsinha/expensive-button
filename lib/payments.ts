@@ -48,6 +48,9 @@ export async function createCheckout(
           product_data: {
             name: "One press of The Expensive Button",
             description: `Puts "${intent.name}" on the button until someone pays more. All sales final.`,
+            // Required for Stripe Managed Payments / Tax. "General -
+            // Electronically Supplied Services": a digital placement.
+            tax_code: process.env.STRIPE_TAX_CODE ?? "txcd_10000000",
           },
         },
       },
