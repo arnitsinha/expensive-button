@@ -3,7 +3,7 @@
  * Everything here runs server-side only.
  */
 
-const FETCH_TIMEOUT_MS = 5000;
+const FETCH_TIMEOUT_MS = 8000;
 const HTML_MAX_BYTES = 256 * 1024;
 const ICON_MAX_BYTES = 512 * 1024;
 const UA = "ExpensiveButtonBot/0.1 (+favicon fetch)";
@@ -113,36 +113,64 @@ export function extractIconHrefs(html: string, base: string): string[] {
 }
 
 export type Icon = { bytes: Uint8Array; contentType: string };
+export type Trace = string[];
 
-async function tryIcon(url: string): Promise<Icon | null> {
+async function tryIcon(url: string, trace?: Trace): Promise<Icon | null> {
   try {
     const u = new URL(url);
-    if (!isPublicHostname(u.hostname.toLowerCase())) return null;
+    if (!isPublicHostname(u.hostname.toLowerCase())) {
+      trace?.push(`skip non-public: ${url}`);
+      return null;
+    }
     const res = await fetchWithTimeout(url);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      trace?.push(`icon ${res.status}: ${url}`);
+      return null;
+    }
     const ct =
       res.headers.get("content-type")?.split(";")[0].trim().toLowerCase() ?? "";
-    if (!ct.startsWith("image/") && ct !== "application/octet-stream")
+    if (!ct.startsWith("image/") && ct !== "application/octet-stream") {
+      trace?.push(`icon not-image (${ct || "none"}): ${url}`);
       return null;
+    }
     const bytes = await readCapped(res, ICON_MAX_BYTES);
-    if (!bytes || bytes.byteLength === 0) return null;
+    if (!bytes || bytes.byteLength === 0) {
+      trace?.push(`icon empty/too-large: ${url}`);
+      return null;
+    }
+    trace?.push(`icon ok (${ct}, ${bytes.byteLength}B): ${url}`);
     return {
       bytes,
       contentType: ct === "application/octet-stream" ? "image/x-icon" : ct,
     };
-  } catch {
+  } catch (e) {
+    trace?.push(`icon error (${(e as Error)?.name ?? "err"}): ${url}`);
     return null;
   }
 }
 
 /**
- * Discover a site's favicon: <link rel=icon> from the homepage HTML,
- * then /favicon.ico, then Google's favicon service as a last resort.
+ * Discover a site's favicon: Google's favicon service first (fast CDN, works
+ * for sites that block bots or have no /favicon.ico), then the site's own
+ * <link rel=icon>, then /favicon.ico.
  */
-export async function fetchFavicon(site: string): Promise<Icon | null> {
+export async function fetchFavicon(
+  site: string,
+  trace?: Trace,
+): Promise<Icon | null> {
   const origin = new URL(site).origin;
+  const host = new URL(site).hostname;
 
-  // 1. Icons declared in the HTML.
+  // 1. Google's favicon cache. Reliable and quick; covers most sites.
+  const g = await tryIcon(
+    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`,
+    trace,
+  );
+  // Google returns a generic globe (a small PNG) for unknown domains; anything
+  // over ~200 bytes is a real site icon. Below that, keep looking.
+  if (g && g.bytes.byteLength > 200) return g;
+
+  // 2. Icons declared in the site's HTML.
   try {
     const res = await fetchWithTimeout(site, {
       headers: { Accept: "text/html,application/xhtml+xml" },
@@ -155,20 +183,23 @@ export async function fetchFavicon(site: string): Promise<Icon | null> {
           0,
           4,
         )) {
-          const icon = await tryIcon(href);
+          const icon = await tryIcon(href, trace);
           if (icon) return icon;
         }
+      } else {
+        trace?.push("html too large");
       }
+    } else {
+      trace?.push(`html ${res.status}: ${site}`);
     }
-  } catch {}
+  } catch (e) {
+    trace?.push(`html error (${(e as Error)?.name ?? "err"}): ${site}`);
+  }
 
-  // 2. Conventional location.
-  const ico = await tryIcon(`${origin}/favicon.ico`);
+  // 3. Conventional location.
+  const ico = await tryIcon(`${origin}/favicon.ico`, trace);
   if (ico) return ico;
 
-  // 3. Google's cache (handles sites that block bots).
-  const host = new URL(site).hostname;
-  return tryIcon(
-    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`,
-  );
+  // Fall back to Google's globe if that was all we found.
+  return g;
 }
