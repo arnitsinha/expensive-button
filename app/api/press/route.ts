@@ -163,10 +163,22 @@ export async function POST(request: Request) {
     console.error("press failed", e);
     // Surface only the error class (e.g. StripeAuthenticationError) so a
     // misconfigured key is diagnosable without exposing details.
-    const err = e as { type?: string; param?: string; name?: string };
-    const reason = [err.type ?? err.name ?? "unknown", err.param]
+    const err = e as {
+      type?: string;
+      code?: string;
+      param?: string;
+      name?: string;
+      message?: string;
+    };
+    // Stripe error messages are written for merchants and carry no secrets.
+    const reason = [
+      err.type ?? err.name ?? "unknown",
+      err.code,
+      err.param,
+      err.message?.slice(0, 200),
+    ]
       .filter(Boolean)
-      .join(": ");
+      .join(" | ");
     return Response.json(
       { error: "Payment setup failed", reason },
       { status: 500 },
