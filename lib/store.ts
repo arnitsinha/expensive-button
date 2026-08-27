@@ -199,6 +199,11 @@ export function markRefunded(sessionId: string): Promise<ButtonState> {
   });
 }
 
+/** Wipe everything back to a fresh $1 button. */
+export function resetState(): Promise<ButtonState> {
+  return update(() => ({ ...initial }));
+}
+
 /** Moderation: remove a press from the ledger. The minimum price is kept. */
 export function hidePress(id: number): Promise<ButtonState> {
   return update((state) => {
