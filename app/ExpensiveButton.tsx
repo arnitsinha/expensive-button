@@ -62,7 +62,31 @@ function faviconSrc(site: string) {
   return `/api/favicon?site=${encodeURIComponent(site)}`;
 }
 
-function Favicon({ site, size }: { site: string; size: number }) {
+// Does the typed value look like a complete domain worth fetching? Mirrors the
+// server's isPublicHostname so we don't fire requests for half-typed hosts
+// like "github.co" while the user is still typing "github.com".
+function looksLikeDomain(input: string): boolean {
+  const host = input
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .split(/[/?#]/)[0];
+  if (!host || host.length > 253) return false;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return false;
+  return /^(?=.{1,253}$)([a-z0-9-]{1,63}\.)+[a-z]{2,63}$/.test(host);
+}
+
+function FaviconImg({ site, size }: { site: string; size: number }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <span
+        aria-hidden
+        className="shrink-0 rounded-md bg-zinc-200 dark:bg-zinc-700"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
   // Proxied through our own API; next/image adds nothing here.
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -72,10 +96,27 @@ function Favicon({ site, size }: { site: string; size: number }) {
       width={size}
       height={size}
       loading="lazy"
+      onError={() => setFailed(true)}
       className="shrink-0 rounded-md bg-white/90 object-contain p-0.5"
       style={{ width: size, height: size }}
     />
   );
+}
+
+// `key` on the site remounts on change, so the failed state resets without a
+// setState-in-effect (which the lint rules disallow).
+function Favicon({ site, size }: { site: string; size: number }) {
+  return <FaviconImg key={site} site={site} size={size} />;
+}
+
+/** Returns `value` only after it has stopped changing for `delayMs`. */
+function useDebounced<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(t);
+  }, [value, delayMs]);
+  return debounced;
 }
 
 function money(n: number) {
@@ -260,6 +301,14 @@ export default function ExpensiveButton({
 
   const trimmed = name.trim();
   const trimmedSite = site.trim();
+  // Live favicon preview: wait until typing settles and the host looks whole,
+  // so we don't flash the icon of a half-typed domain (e.g. "github.co").
+  const debouncedSite = useDebounced(trimmedSite, 400);
+  const previewSite = looksLikeDomain(debouncedSite) ? debouncedSite : "";
+  const sitePending =
+    !!trimmedSite &&
+    looksLikeDomain(trimmedSite) &&
+    previewSite !== trimmedSite;
   const holder = state.presses[0] ?? null;
   const isHolder = !!trimmed && state.holder === trimmed;
   const minimum = state.price;
@@ -496,11 +545,13 @@ export default function ExpensiveButton({
               spellCheck={false}
               className={`${inputClass} w-full pr-9`}
             />
-            {trimmedSite && (
-              <span className="pointer-events-none absolute right-2">
-                <Favicon site={trimmedSite} size={20} />
-              </span>
-            )}
+            <span className="pointer-events-none absolute right-2 flex h-5 w-5 items-center justify-center">
+              {sitePending ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-red-500" />
+              ) : previewSite ? (
+                <Favicon site={previewSite} size={20} />
+              ) : null}
+            </span>
           </span>
         </label>
         {/* Enter submits; the visible CTA is the big button itself. */}
