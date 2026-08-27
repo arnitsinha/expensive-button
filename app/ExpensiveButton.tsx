@@ -124,7 +124,14 @@ type Toast = { id: number; text: string; kind: "info" | "win" };
 
 /* ------------------------------------------------------------------ */
 
-export default function ExpensiveButton({ initial }: { initial: ButtonState }) {
+export default function ExpensiveButton({
+  initial,
+  live = false,
+}: {
+  initial: ButtonState;
+  /** True when Stripe is configured: pressing goes straight to Checkout. */
+  live?: boolean;
+}) {
   const [state, setState] = useState<ButtonState>(initial);
   const name = usePersisted(nameStore);
   const site = usePersisted(siteStore);
@@ -275,6 +282,11 @@ export default function ExpensiveButton({ initial }: { initial: ButtonState }) {
       return;
     }
     setError(null);
+    if (live) {
+      // Real payments: no in-app modal, straight to Stripe Checkout.
+      void confirmPress();
+      return;
+    }
     setConfirming(true);
   }
 
@@ -302,6 +314,7 @@ export default function ExpensiveButton({ initial }: { initial: ButtonState }) {
       }
       if (!res.ok) throw new Error(data.error ?? "Something went wrong");
       if (typeof data.checkoutUrl === "string") {
+        toast("Taking you to Stripe…");
         // Live mode: off to Stripe Checkout. The webhook records the press
         // and we pick the result up from ?paid=1&session_id=... on return.
         window.location.assign(data.checkoutUrl);
@@ -311,7 +324,9 @@ export default function ExpensiveButton({ initial }: { initial: ButtonState }) {
       setExtra(0);
       setConfirming(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      const msg = e instanceof Error ? e.message : "Something went wrong";
+      if (live) toast(msg);
+      else setError(msg);
     } finally {
       setBusy(false);
     }

@@ -23,7 +23,7 @@ export default async function Home() {
           </p>
         )}
       </header>
-      <ExpensiveButton initial={state} />
+      <ExpensiveButton initial={state} live={!testMode} />
       <footer className="mt-20 max-w-md text-center text-xs leading-relaxed text-zinc-500">
         <p>
           All payments are final. You are buying a spot on the button, not a
