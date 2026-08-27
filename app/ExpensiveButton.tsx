@@ -327,6 +327,10 @@ export default function ExpensiveButton({
   const amount = minimum + extra;
   const step = amount >= 1000 ? 100 : amount >= 100 ? 10 : 1;
   const bump = (d: number) => setExtra((x) => Math.max(0, x + d));
+  // What the button face shows: the holder's favicon, or a preview of the
+  // site you're about to add.
+  const faceSite = state.holderSite ?? previewSite;
+  const cta = isHolder ? "you own this" : extra > 0 ? "flex for" : "press for";
 
   const biggest = state.presses.reduce<Press | null>(
     (best, p) => (best && best.price >= p.price ? best : p),
@@ -453,48 +457,33 @@ export default function ExpensiveButton({
           disabled:cursor-not-allowed disabled:opacity-60
           ${flash ? "scale-105 ring-8 ring-yellow-400/60" : ""}`}
         >
-          {state.holderSite && (
-            <span className="mb-2 rounded-xl bg-white p-1 shadow-lg">
-              <Favicon site={state.holderSite} size={40} />
+          {faceSite ? (
+            <span className="rounded-2xl bg-white p-2 shadow-lg">
+              <Favicon site={faceSite} size={88} />
             </span>
-          )}
-          <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-red-200 sm:text-xs">
-            {isHolder ? "you own this" : extra > 0 ? "flex for" : "press for"}
-          </span>
-          <span className="mt-1 text-5xl font-black tabular-nums drop-shadow sm:text-6xl">
-            {money(amount)}
-          </span>
-          <span className="mt-3 max-w-[85%] truncate text-xs text-red-100 sm:text-sm">
-            {state.holder ? (
-              <>
-                held by <b className="text-white">{state.holder}</b>
-                {state.holderSite && (
-                  <>
-                    {" "}
-                    &middot;{" "}
-                    <a
-                      href={state.holderSite}
-                      target="_blank"
-                      rel="noopener noreferrer nofollow"
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-white underline decoration-red-300 hover:decoration-white"
-                    >
-                      {hostnameOf(state.holderSite)}
-                    </a>
-                  </>
-                )}
-              </>
-            ) : (
-              "nobody has pressed it yet"
-            )}
-          </span>
-          {reign !== null && (
-            <span
-              suppressHydrationWarning
-              className="mt-1 text-[11px] tabular-nums text-red-200"
+          ) : state.holder ? (
+            <span className="flex h-24 w-24 items-center justify-center rounded-2xl bg-white text-5xl font-black text-red-600">
+              {state.holder.slice(0, 1).toUpperCase()}
+            </span>
+          ) : (
+            // Nobody has pressed yet: a wordless "tap here" target.
+            <svg
+              viewBox="0 0 100 100"
+              className="h-24 w-24 text-white/80"
+              fill="none"
+              stroke="currentColor"
+              aria-hidden
             >
-              held for {duration(reign)}
-            </span>
+              <circle cx="50" cy="50" r="30" strokeWidth="4" opacity="0.5" />
+              <circle cx="50" cy="50" r="42" strokeWidth="3" opacity="0.25" />
+              <circle
+                cx="50"
+                cy="50"
+                r="12"
+                fill="currentColor"
+                stroke="none"
+              />
+            </svg>
           )}
         </button>
         <button
@@ -507,7 +496,50 @@ export default function ExpensiveButton({
           +
         </button>
       </div>
-      <p className="-mt-6 text-xs text-zinc-500">
+
+      {/* Button caption (moved out of the button itself) */}
+      <div className="-mt-4 flex flex-col items-center gap-1 text-center">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.3em] text-red-500">
+          {cta}
+        </span>
+        <span className="text-5xl font-black tabular-nums text-zinc-900 dark:text-zinc-50">
+          {money(amount)}
+        </span>
+        <span className="max-w-xs truncate text-sm text-zinc-600 dark:text-zinc-400">
+          {state.holder ? (
+            <>
+              held by{" "}
+              <b className="text-zinc-900 dark:text-zinc-50">{state.holder}</b>
+              {state.holderSite && (
+                <>
+                  {" "}
+                  &middot;{" "}
+                  <a
+                    href={state.holderSite}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                    className="underline decoration-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-50"
+                  >
+                    {hostnameOf(state.holderSite)}
+                  </a>
+                </>
+              )}
+            </>
+          ) : (
+            "nobody has pressed it yet"
+          )}
+        </span>
+        {reign !== null && (
+          <span
+            suppressHydrationWarning
+            className="text-xs tabular-nums text-zinc-400"
+          >
+            held for {duration(reign)}
+          </span>
+        )}
+      </div>
+
+      <p className="text-xs text-zinc-500">
         Minimum {money(minimum)}
         {extra > 0 && (
           <>
