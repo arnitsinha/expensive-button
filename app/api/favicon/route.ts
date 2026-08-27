@@ -74,11 +74,11 @@ export async function GET(request: Request) {
   return new Response(body as BodyInit, {
     headers: {
       "Content-Type": icon ? icon.contentType : "image/png",
-      // `private` keeps this out of Netlify's shared CDN, whose cache key
-      // ignores the `site` query param and would otherwise serve one site's
-      // favicon for every site. The browser still caches per full URL, and
-      // the function keeps its own in-memory cache, so repeat loads are cheap.
-      "Cache-Control": "private, max-age=86400",
+      // No caching anywhere: the browser and Netlify's shared CDN both refetch
+      // every time (the CDN's cache key ignored the `site` param and served one
+      // site's favicon for all). The function keeps its own in-memory cache, so
+      // the upstream sites aren't hit on repeat loads.
+      "Cache-Control": "no-store",
       "Netlify-CDN-Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
     },
