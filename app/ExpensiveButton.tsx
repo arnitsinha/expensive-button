@@ -58,8 +58,12 @@ const inputClass =
 const stepperClass =
   "flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-zinc-300 bg-white text-2xl font-bold text-zinc-700 shadow transition select-none enabled:hover:border-red-500 enabled:hover:text-red-600 enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 sm:h-14 sm:w-14 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200";
 
+// Bump when the favicon behaviour changes so browsers that cached a bad icon
+// (from the old CDN cache-key bug) fetch a fresh URL instead of the stale one.
+const FAVICON_V = 2;
+
 function faviconSrc(site: string) {
-  return `/api/favicon?site=${encodeURIComponent(site)}`;
+  return `/api/favicon?site=${encodeURIComponent(site)}&v=${FAVICON_V}`;
 }
 
 // Does the typed value look like a complete domain worth fetching? Mirrors the
