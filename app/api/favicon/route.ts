@@ -75,6 +75,9 @@ export async function GET(request: Request) {
     headers: {
       "Content-Type": icon ? icon.contentType : "image/png",
       "Cache-Control": "public, max-age=21600",
+      // Netlify's CDN otherwise ignores query params in the cache key and
+      // would serve one site's favicon for every site. Key on `site`.
+      "Netlify-Vary": "query=site",
       "X-Content-Type-Options": "nosniff",
     },
   });
