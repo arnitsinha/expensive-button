@@ -32,17 +32,33 @@ function clientIp(request: Request): string {
   );
 }
 
+/** Absolute https origin for Stripe redirects. Tolerates a configured value
+ *  like "button.example.com" or "https://button.example.com/". */
 function siteOrigin(request: Request): string {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.URL;
-  if (configured) return configured.replace(/\/$/, "");
-  const url = new URL(request.url);
-  const proto =
-    request.headers.get("x-forwarded-proto") ?? url.protocol.replace(":", "");
-  const host =
-    request.headers.get("x-forwarded-host") ??
-    request.headers.get("host") ??
-    url.host;
-  return `${proto}://${host}`;
+  const candidates = [
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.URL, // set by Netlify
+    (() => {
+      const url = new URL(request.url);
+      const proto =
+        request.headers.get("x-forwarded-proto") ??
+        url.protocol.replace(":", "");
+      const host =
+        request.headers.get("x-forwarded-host") ??
+        request.headers.get("host") ??
+        url.host;
+      return `${proto}://${host}`;
+    })(),
+  ];
+  for (const raw of candidates) {
+    const v = raw?.trim();
+    if (!v) continue;
+    try {
+      const u = new URL(/^https?:\/\//i.test(v) ? v : `https://${v}`);
+      if (u.hostname) return u.origin;
+    } catch {}
+  }
+  throw new Error("Could not determine site origin");
 }
 
 // Control characters (C0 + DEL), written as escapes so they survive editors.
