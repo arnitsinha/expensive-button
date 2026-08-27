@@ -145,6 +145,13 @@ export async function POST(request: Request) {
       return Response.json({ error: "Busy - try again" }, { status: 503 });
     }
     console.error("press failed", e);
-    return Response.json({ error: "Payment setup failed" }, { status: 500 });
+    // Surface only the error class (e.g. StripeAuthenticationError) so a
+    // misconfigured key is diagnosable without exposing details.
+    const reason =
+      (e as { type?: string }).type ?? (e as Error)?.name ?? "unknown";
+    return Response.json(
+      { error: "Payment setup failed", reason },
+      { status: 500 },
+    );
   }
 }
